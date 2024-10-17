@@ -4,15 +4,19 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.substitutions import LaunchConfiguration
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, ExecuteProcess
+import launch_ros
+from launch_ros.actions import SetParameter, Node
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 
 def generate_launch_description():
 
-    use_sim_time = LaunchConfiguration('use_sim_time',  default='true')
+    use_sim_time = LaunchConfiguration('use_sim_time',  default='true')    
+    use_simulator = LaunchConfiguration('use_sim_time',  default='true')
+    print(use_sim_time)
     this_directory = get_package_share_directory('stage_ros2')
     launch_dir = os.path.join(this_directory, 'launch')
 
@@ -22,7 +26,12 @@ def generate_launch_description():
         default_value='false',
         description='on true a prefixes are used for a single robot environment')
     
-
+    declare_use_sim_time_cmd = DeclareLaunchArgument(
+        'use_sim_time',
+        default_value='true',
+        description='Use simulation (Gazebo) clock if true',
+    )
+    
     one_tf_tree = LaunchConfiguration('one_tf_tree')
     one_tf_tree_cmd = DeclareLaunchArgument(
         'one_tf_tree',
@@ -49,16 +58,26 @@ def generate_launch_description():
 
     world = LaunchConfiguration('world')
     declare_world = DeclareLaunchArgument(
-        'world', default_value='cave_three_robots',
+        'world', default_value='cave_one_robot',
         description='world to load in stage and rviz config [cave, example]')
-
+        
+    gazebo_server = ExecuteProcess(
+        cmd=['gz', 'sim', '-r', '-s'],
+        output='screen',
+        condition=IfCondition(use_simulator)
+    )
+          
     return LaunchDescription([
         declare_namespace_cmd,
+        SetParameter(name='use_sim_time', value=True),
+        SetParameter(name='use_simulator', value=True),
         declare_rviz_cmd,
+        gazebo_server,
         declare_stage_cmd,
         enforce_prefixes_cmd,
         one_tf_tree_cmd,
         declare_world,
+        declare_use_sim_time_cmd,
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(launch_dir, 'rviz.launch.py')),
             condition=IfCondition(rviz),
